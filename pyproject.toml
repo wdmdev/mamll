@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "mamll"
+version = "0.1.0"
+description = ""
+authors = ["William Marstrand <wdmdevelop@gmail.com>"]
+readme = "README.md"
+packages = [{include = "mamll", from = "src"},]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+torch = "^2.2.0"
+tqdm = "^4.66.1"
+torchvision = "^0.17.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+vae_bern = "mamll.dgm:vae_bernoulli"
