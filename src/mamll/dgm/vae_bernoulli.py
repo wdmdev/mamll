@@ -120,7 +120,7 @@ class VAE(nn.Module):
            Number of samples to use for the Monte Carlo estimate of the ELBO.
         """
         q = self.encoder(x)
-        z = q.rsample()
+        z = q.rsample() #reparameterization trick, under the hood
         elbo = torch.mean(self.decoder(z).log_prob(x) - td.kl_divergence(q, self.prior()), dim=0)
         return elbo
 
