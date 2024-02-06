@@ -154,7 +154,7 @@ class VAE(nn.Module):
             torch.Tensor: The ELBO for the given batch of data.
         """
         q = self.encoder(x)
-        z = q.rsample()
+        z = q.rsample() #reparameterization trick, under the hood
         elbo = torch.mean(self.decoder(z).log_prob(x) - td.kl_divergence(q, self.prior()), dim=0)
         return elbo
 
