@@ -8,7 +8,9 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 from tqdm import tqdm
-from mamll.plot.vae import plot_posterior
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+# from mamll.plot.vae import plot_posterior
 from mamll.dgm.models.vae import VAE, GaussianPrior, BernoulliDecoder, GaussianEncoder
 
 def get_next_batch(data_loader: torch.utils.data.DataLoader) -> torch.Tensor:
@@ -179,12 +181,21 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.model, map_location=torch.device(args.device)))
         data_loader = mnist_test_loader
 
-        samples = []
-        for batch in data_loader:
-            x, label = batch
-            x = x.to(model.device)
-            label = label.to(model.device)
-            sample = model.sample_posterior(x)
-            samples.append((sample, label))
+        with torch.no_grad():
+            x, y = next(iter(data_loader))
+            x = x.to(device)
+            y = y.to(device)
+            z = model.sample_posterior(x)
 
-        plot_posterior(samples, args.sample_posterior) #type: ignore
+            plt.figure(figsize=(10, 10))
+            for sample in z:
+                if sample.shape[1] > 2:
+                    pca = PCA(n_components=2)
+                    pca_sample = pca.fit_transform(sample.detach().cpu().numpy())
+
+                    plt.scatter(sample[:, 0], sample[:, 1], c=y, cmap='tab10')
+                    plt.colorbar()
+                    plt.title(f'{sample.shape[0]} samples from the approximate posterior. {z.shape[2]} dimensions reduced to 2 using PCA')
+
+            plt.savefig(args.sample_posterior, dpi=300)
+

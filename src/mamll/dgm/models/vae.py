@@ -176,9 +176,9 @@ class VAE(nn.Module):
             torch.Tensor: A tensor of dimension `(n_samples, feature_dim1, feature_dim2, ...)`
         """
         q = self.encoder(x)
-        z = q.sample(torch.Size([n_samples]))
-        return self.decoder(z).sample()
-    
+        z = q.rsample(torch.Size([n_samples]))
+        return z
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Compute the negative ELBO for the given batch of data.
 
