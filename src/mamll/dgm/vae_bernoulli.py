@@ -102,7 +102,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=64, metavar='N', help='batch size for training (default: %(default)s)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N', help='number of epochs to train (default: %(default)s)')
     parser.add_argument('--latent-dim', type=int, default=32, metavar='N', help='dimension of latent variable (default: %(default)s)')
-    parser.add_argument('--sample_posterior', type=str, default='posterior_samples.png', help='sample from the posterior distribution (default: %(default)s)')
+    parser.add_argument('--sample_posterior', type=str, default='posterior_samples.png', help='file to save posterior sample plot in (default: %(default)s)')
 
     args = parser.parse_args()
     print('# Options')

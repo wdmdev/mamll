@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.distributions as td
 import torch.utils.data
+from torch.distributions import Normal, Categorical, MixtureSameFamily
 
 class GaussianPrior(nn.Module):
     """Gaussian prior distribution."""
@@ -191,3 +192,26 @@ class VAE(nn.Module):
             torch.Tensor: The negative ELBO for the given batch of data.
         """
         return -self.elbo(x)
+
+class MoGVAE(VAE):
+    def __init__(self, prior: torch.nn.Module, decoder: torch.nn.Module, encoder: torch.nn.Module, num_components=10):
+        super(MoGVAE, self).__init__(prior, decoder, encoder)
+
+        # Define the component distribution
+        self.component_distribution = Normal(torch.zeros(num_components), torch.ones(num_components))
+
+        # Define the mixture distribution
+        self.mixture_distribution = Categorical(torch.ones(num_components,)/num_components)
+
+        # Define the MoG prior
+        self.mog_prior = MixtureSameFamily(self.mixture_distribution, self.component_distribution)
+
+    def elbo(self, x: torch.Tensor) -> torch.Tensor:
+        q = self.encoder(x)
+        z = self.mog_prior.sample(torch.Size([x.shape[0]]))  # Sample from the MoG prior
+        elbo = torch.mean(self.decoder(z).log_prob(x) - td.kl_divergence(q, self.mog_prior), dim=0)
+        return elbo
+
+    def sample_posterior(self, x: torch.Tensor, n_samples:int=1) -> torch.Tensor:
+        z = self.mog_prior.sample(torch.Size([n_samples]))  # Sample from the MoG prior
+        return z
