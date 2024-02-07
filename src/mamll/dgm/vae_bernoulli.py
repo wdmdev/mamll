@@ -11,7 +11,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 # from mamll.plot.vae import plot_posterior
-from mamll.dgm.models.vae import VAE, GaussianPrior, BernoulliDecoder, GaussianEncoder
+from mamll.dgm.models.vae import VAE, MoGPrior, GaussianPrior, BernoulliDecoder, GaussianEncoder
 
 def get_next_batch(data_loader: torch.utils.data.DataLoader) -> torch.Tensor:
     """ Get the next batch of data from a data loader.
@@ -123,6 +123,7 @@ if __name__ == "__main__":
     # Define prior distribution
     M = args.latent_dim
     prior = GaussianPrior(M)
+    # prior = MoGPrior(M, 10) # Mixture of 10 Gaussians prior
 
     # Define encoder and decoder networks
     encoder_net = nn.Sequential(

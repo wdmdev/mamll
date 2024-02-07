@@ -29,31 +29,25 @@ class GaussianPrior(nn.Module):
         prior = td.Independent(td.Normal(loc=self.mean, scale=self.std), 1)
         return prior
 
-class MixtureGaussianPrior(nn.Module):
+class MoGPrior(nn.Module):
     """Mixture Gaussian prior distribution."""
     def __init__(self, M:int, K:int) -> None:
-        """ Define a mixture Gaussian prior distribution with K components.
-
-        Args:
-        ----------
-            M (int): Dimension of the latent space (number of latent variables).
-            K (int): Number of components in the mixture.
-        """
-        super(MixtureGaussianPrior, self).__init__()
+        """Define a mixture of Gaussian prior distribution with K components."""
+        super(MoGPrior, self).__init__()
         self.M = M
         self.K = K
-        self.mean = nn.Parameter(torch.zeros(self.M, self.K), requires_grad=False)
-        self.std = nn.Parameter(torch.ones(self.M, self.K), requires_grad=False)
+        # Initialize parameters for K components
+        self.means = nn.Parameter(torch.zeros(K, M), requires_grad=False)
+        self.log_stds = nn.Parameter(torch.zeros(K, M), requires_grad=False)
+        self.mixture_weights = nn.Parameter(torch.ones(K) / K)  # Initialize mixture weights to be uniform
 
     def forward(self) -> torch.distributions.Distribution:
-        """ Return the prior distribution.
-
-        Returns:
-        ----------
-            torch.distributions.Distribution: The prior distribution.
-        """
-        prior = td.Independent(td.Normal(loc=self.mean, scale=self.std), 1)
+        """Return the prior distribution."""
+        component_distribution = td.Independent(td.Normal(loc=self.means, scale=self.log_stds.exp()), 1)
+        mixture_distribution = Categorical(logits=self.mixture_weights)
+        prior = MixtureSameFamily(mixture_distribution, component_distribution)
         return prior
+
 
 
 class GaussianEncoder(nn.Module):
@@ -192,26 +186,3 @@ class VAE(nn.Module):
             torch.Tensor: The negative ELBO for the given batch of data.
         """
         return -self.elbo(x)
-
-class MoGVAE(VAE):
-    def __init__(self, prior: torch.nn.Module, decoder: torch.nn.Module, encoder: torch.nn.Module, num_components=10):
-        super(MoGVAE, self).__init__(prior, decoder, encoder)
-
-        # Define the component distribution
-        self.component_distribution = Normal(torch.zeros(num_components), torch.ones(num_components))
-
-        # Define the mixture distribution
-        self.mixture_distribution = Categorical(torch.ones(num_components,)/num_components)
-
-        # Define the MoG prior
-        self.mog_prior = MixtureSameFamily(self.mixture_distribution, self.component_distribution)
-
-    def elbo(self, x: torch.Tensor) -> torch.Tensor:
-        q = self.encoder(x)
-        z = self.mog_prior.sample(torch.Size([x.shape[0]]))  # Sample from the MoG prior
-        elbo = torch.mean(self.decoder(z).log_prob(x) - td.kl_divergence(q, self.mog_prior), dim=0)
-        return elbo
-
-    def sample_posterior(self, x: torch.Tensor, n_samples:int=1) -> torch.Tensor:
-        z = self.mog_prior.sample(torch.Size([n_samples]))  # Sample from the MoG prior
-        return z
