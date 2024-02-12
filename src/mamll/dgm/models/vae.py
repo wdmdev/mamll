@@ -2,12 +2,14 @@ import torch
 import torch.nn as nn
 import torch.distributions as td
 import torch.utils.data
-from torch.distributions import Normal, Categorical, MixtureSameFamily
+from torch.distributions import Categorical, MixtureSameFamily
+
 
 class GaussianPrior(nn.Module):
     """Gaussian prior distribution."""
-    def __init__(self, M:int) -> None:
-        """ Define a Gaussian prior distribution with zero mean and unit variance.
+
+    def __init__(self, M: int) -> None:
+        """Define a Gaussian prior distribution with zero mean and unit variance.
 
         Args:
         ----------
@@ -19,7 +21,7 @@ class GaussianPrior(nn.Module):
         self.std = nn.Parameter(torch.ones(self.M), requires_grad=False)
 
     def forward(self) -> torch.distributions.Distribution:
-        """ Return the prior distribution.
+        """Return the prior distribution.
 
         Returns:
         ----------
@@ -29,9 +31,11 @@ class GaussianPrior(nn.Module):
         prior = td.Independent(td.Normal(loc=self.mean, scale=self.std), 1)
         return prior
 
+
 class MoGPrior(nn.Module):
     """Mixture Gaussian prior distribution."""
-    def __init__(self, M:int, K:int) -> None:
+
+    def __init__(self, M: int, K: int) -> None:
         """Define a mixture of Gaussian prior distribution with K components."""
         super(MoGPrior, self).__init__()
         self.M = M
@@ -39,27 +43,31 @@ class MoGPrior(nn.Module):
         # Initialize parameters for K components
         self.means = nn.Parameter(torch.zeros(K, M), requires_grad=False)
         self.log_stds = nn.Parameter(torch.zeros(K, M), requires_grad=False)
-        self.mixture_weights = nn.Parameter(torch.ones(K) / K)  # Initialize mixture weights to be uniform
+        self.mixture_weights = nn.Parameter(
+            torch.ones(K) / K
+        )  # Initialize mixture weights to be uniform
 
     def forward(self) -> torch.distributions.Distribution:
         """Return the prior distribution."""
-        component_distribution = td.Independent(td.Normal(loc=self.means, scale=self.log_stds.exp()), 1)
+        component_distribution = td.Independent(
+            td.Normal(loc=self.means, scale=self.log_stds.exp()), 1
+        )
         mixture_distribution = Categorical(logits=self.mixture_weights)
         prior = MixtureSameFamily(mixture_distribution, component_distribution)
         return prior
 
 
-
 class GaussianEncoder(nn.Module):
     """Gaussian encoder distribution."""
+
     def __init__(self, encoder_net: torch.nn.Module) -> None:
-        """ Define a Gaussian encoder distribution based on a given encoder network.
+        """Define a Gaussian encoder distribution based on a given encoder network.
 
         Args:
         ----------
-            encoder_net (torch.nn.Module): The encoder network that takes as a tensor of dim 
-                                            `(batch_size, feature_dim1, feature_dim2)` and output 
-                                            a tensor of dimension `(batch_size, 2M)`, 
+            encoder_net (torch.nn.Module): The encoder network that takes as a tensor of dim
+                                            `(batch_size, feature_dim1, feature_dim2)` and output
+                                            a tensor of dimension `(batch_size, 2M)`,
                                             where M is the dimension of the latent space.
         """
 
@@ -67,7 +75,7 @@ class GaussianEncoder(nn.Module):
         self.encoder_net = encoder_net
 
     def forward(self, x: torch.Tensor) -> torch.distributions.Distribution:
-        """ Given a batch of data, return a Gaussian distribution over the latent space.
+        """Given a batch of data, return a Gaussian distribution over the latent space.
 
         Args:
         ----------
@@ -83,22 +91,23 @@ class GaussianEncoder(nn.Module):
 
 class BernoulliDecoder(nn.Module):
     """Bernoulli decoder distribution."""
+
     def __init__(self, decoder_net: torch.nn.Module) -> None:
-        """ Define a Bernoulli decoder distribution based on a given decoder network.
+        """Define a Bernoulli decoder distribution based on a given decoder network.
 
         Args:
         ----------
-            decoder_net (torch.nn.Module): A decoder network that transforms an input tensor of 
-                                             shape `(batch_size, M)` to an output tensor of shape 
-                                             `(batch_size, feature_dim1, feature_dim2)`. M is the 
+            decoder_net (torch.nn.Module): A decoder network that transforms an input tensor of
+                                             shape `(batch_size, M)` to an output tensor of shape
+                                             `(batch_size, feature_dim1, feature_dim2)`. M is the
                                              latent space dimension.
         """
         super(BernoulliDecoder, self).__init__()
         self.decoder_net = decoder_net
-        self.std = nn.Parameter(torch.ones(28, 28)*0.5, requires_grad=True)
+        self.std = nn.Parameter(torch.ones(28, 28) * 0.5, requires_grad=True)
 
     def forward(self, z: torch.Tensor) -> torch.distributions.Distribution:
-        """ Given a batch of latent variables, return a Bernoulli distribution over the data space.
+        """Given a batch of latent variables, return a Bernoulli distribution over the data space.
 
         Args:
         ----------
@@ -114,8 +123,11 @@ class BernoulliDecoder(nn.Module):
 
 class VAE(nn.Module):
     """Variational Autoencoder (VAE) model."""
-    def __init__(self, prior: torch.nn.Module, decoder: torch.nn.Module, encoder: torch.nn.Module) -> None:
-        """ VAE model.
+
+    def __init__(
+        self, prior: torch.nn.Module, decoder: torch.nn.Module, encoder: torch.nn.Module
+    ) -> None:
+        """VAE model.
 
         Args:
         ----------
@@ -129,7 +141,7 @@ class VAE(nn.Module):
         self.encoder = encoder
 
     def elbo(self, x: torch.Tensor) -> torch.Tensor:
-        """ Compute the ELBO for the given batch of data.
+        """Compute the ELBO for the given batch of data.
 
         Args:
         ----------
@@ -140,12 +152,14 @@ class VAE(nn.Module):
             torch.Tensor: The ELBO for the given batch of data.
         """
         q = self.encoder(x)
-        z = q.rsample() #reparameterization trick, under the hood
-        elbo = torch.mean(self.decoder(z).log_prob(x) - td.kl_divergence(q, self.prior()), dim=0)
+        z = q.rsample()  # reparameterization trick, under the hood
+        elbo = torch.mean(
+            self.decoder(z).log_prob(x) - td.kl_divergence(q, self.prior()), dim=0
+        )
         return elbo
 
-    def sample(self, n_samples:int=1) -> torch.Tensor:
-        """ Sample from the model.
+    def sample(self, n_samples: int = 1) -> torch.Tensor:
+        """Sample from the model.
 
         Args:
         ----------
@@ -157,9 +171,9 @@ class VAE(nn.Module):
         """
         z = self.prior().sample(torch.Size([n_samples]))
         return self.decoder(z).sample()
-    
-    def sample_posterior(self, x: torch.Tensor, n_samples:int=1) -> torch.Tensor:
-        """ Sample from the approximate posterior.
+
+    def sample_posterior(self, x: torch.Tensor, n_samples: int = 1) -> torch.Tensor:
+        """Sample from the approximate posterior.
 
         Args:
         ----------
@@ -175,7 +189,7 @@ class VAE(nn.Module):
         return z
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """ Compute the negative ELBO for the given batch of data.
+        """Compute the negative ELBO for the given batch of data.
 
         Args:
         ----------
