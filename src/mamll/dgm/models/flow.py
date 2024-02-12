@@ -56,38 +56,53 @@ class MaskedCouplingLayer(nn.Module):
         self.translation_net = translation_net
         self.mask = nn.Parameter(mask, requires_grad=False)
 
-    def forward(self, z):
+    def forward(self, x):
         """
         Transform a batch of data through the coupling layer (from the base to data).
 
         Parameters:
         x: [torch.Tensor]
             The input to the transformation of dimension `(batch_size, feature_dim)`
+
         Returns:
         z: [torch.Tensor]
             The output of the transformation of dimension `(batch_size, feature_dim)`
         sum_log_det_J: [torch.Tensor]
             The sum of the log determinants of the Jacobian matrices of the forward transformations of dimension `(batch_size, feature_dim)`.
         """
-        x = z
-        log_det_J = torch.zeros(z.shape[0])
-        return x, log_det_J
+        not_masked = torch.ones(self.mask.shape) - self.mask
+        masked_x = torch.mul(self.mask, x)
+
+        z = masked_x + torch.mul(not_masked, 
+            torch.mul(x, torch.exp(self.scale_net(masked_x) + self.translation_net(masked_x)))
+            )
+
+        masked_z = torch.mul(self.mask, z)
+        log_det_J = torch.sum(not_masked * self.scale_net(masked_z))
+        return z, log_det_J
 
     def inverse(self, x):
         """
         Transform a batch of data through the coupling layer (from data to the base).
 
         Parameters:
-        z: [torch.Tensor]
+        x: [torch.Tensor]
             The input to the inverse transformation of dimension `(batch_size, feature_dim)`
         Returns:
-        x: [torch.Tensor]
+        z: [torch.Tensor]
             The output of the inverse transformation of dimension `(batch_size, feature_dim)`
         sum_log_det_J: [torch.Tensor]
             The sum of the log determinants of the Jacobian matrices of the inverse transformations.
         """
-        z = x
-        log_det_J = torch.zeros(x.shape[0])
+        not_masked = torch.ones(self.mask.shape) - self.mask
+        masked_x = torch.mul(self.mask, x)
+
+        z = masked_x + torch.mul(not_masked,
+            torch.mul(x - self.translation_net(masked_x), torch.exp(-self.scale_net(masked_x)))
+            )
+        
+        masked_z = torch.mul(self.mask, z)
+        log_det_J = torch.sum(not_masked * self.scale_net(masked_z))
         return z, log_det_J
 
 
@@ -227,16 +242,14 @@ def train(model, optimizer, data_loader, epochs, device):
 
 if __name__ == "__main__":
     import torch.utils.data
-    from torchvision import datasets, transforms
-    from torchvision.utils import save_image
-    import ToyData
+    from mamll.datasets import ToyData
 
     # Parse arguments
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "mode",
+        "--mode",
         type=str,
         default="train",
         choices=["train", "sample"],
@@ -252,13 +265,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="model.pt",
+        default="models/flow.pt",
         help="file to save model to or load model from (default: %(default)s)",
     )
     parser.add_argument(
         "--samples",
         type=str,
-        default="samples.png",
+        default="samples/flow.png",
         help="file to save samples in (default: %(default)s)",
     )
     parser.add_argument(
@@ -361,8 +374,8 @@ if __name__ == "__main__":
 
         # Plot the density of the toy data and the model samples
         coordinates = [
-            [[x, y] for x in np.linspace(*toy.xlim, 1000)]
-            for y in np.linspace(*toy.ylim, 1000)
+            [[x, y] for x in np.linspace(*toy.xlim, 1000)] #type: ignore
+            for y in np.linspace(*toy.ylim, 1000) #type: ignore
         ]
         prob = torch.exp(toy().log_prob(torch.tensor(coordinates)))
 
