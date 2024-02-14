@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.distributions as td
 from tqdm import tqdm
+from torchvision import datasets, transforms
 
 
 class GaussianBase(nn.Module):
@@ -104,6 +105,16 @@ class MaskedCouplingLayer(nn.Module):
         masked_z = torch.mul(self.mask, z)
         log_det_J = torch.sum(not_masked * self.scale_net(masked_z))
         return z, log_det_J
+
+class RandomMask(MaskedCouplingLayer):
+    def __init__(self, scale_net, translation_net, D):
+        mask = torch.rand((D,))
+        super().__init__(scale_net, translation_net, mask)
+
+class ChequerboardMask(MaskedCouplingLayer):
+    def __init__(self, scale_net, translation_net, D):
+        mask = (torch.arange(D).unsqueeze(0) + torch.arange(D).unsqueeze(1)) % 2
+        super().__init__(scale_net, translation_net, mask)
 
 
 class Flow(nn.Module):
