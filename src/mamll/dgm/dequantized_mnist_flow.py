@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torchvision import datasets, transforms
 
-from mamll.dgm.models.flow import GaussianBase, RandomMask, Flow
+from mamll.dgm.models.flow import GaussianBase, RandomMask, ChequerboardMask, Flow
 
 def train(model, optimizer, data_loader, epochs, device):
     """
@@ -46,6 +46,13 @@ def train(model, optimizer, data_loader, epochs, device):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--mode",
+        type=str,
+        default="train",
+        choices=["train", "sample"],
+        help="what to do when running the script (default: %(default)s)",
+    )
+    parser.add_argument(
         "--model",
         type=str,
         default="models/flow.pt",
@@ -57,6 +64,12 @@ if __name__ == "__main__":
         default="cpu",
         choices=["cpu", "cuda", "mps"],
         help="torch device (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--samples",
+        type=str,
+        default="samples/flow.png",
+        help="file to save samples in (default: %(default)s)",
     )
     parser.add_argument(
         "--batch-size",
@@ -91,7 +104,7 @@ if __name__ == "__main__":
                     transforms.Lambda(lambda x: x.flatten())
                     ]))
 
-    train_loader = torch.utils.data.DataLoader(
+    train_loader = torch.utils.data.DataLoader( #type: ignore
         train_dataset, batch_size=args.batch_size, shuffle=True
     )
 
@@ -117,11 +130,38 @@ if __name__ == "__main__":
     # Define flow model
     model = Flow(base, transformations).to(args.device)
     
-    # Define optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # Train model
-    train(model, optimizer, train_loader, args.epochs, args.device)
+    if args.mode == "train":
+        # Define optimizer
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # Save model
-    torch.save(model.state_dict(), args.model)
+        # Train model
+        train(model, optimizer, train_loader, args.epochs, args.device)
+
+        # Save model
+        torch.save(model.state_dict(), args.model)
+
+    elif args.mode == "sample":
+        import matplotlib.pyplot as plt
+
+        # Load the trained model
+        model.load_state_dict(
+            torch.load(args.model, map_location=torch.device(args.device))
+        )
+
+        # Generate samples
+        model.eval()
+        with torch.no_grad():
+            samples = model.sample((10000,)).cpu()
+
+        # Reshape the samples to 28x28 (the size of MNIST images)
+        samples = samples.view(-1, 28, 28)
+
+        # Plot the samples
+        fig, axs = plt.subplots(10, 10, figsize=(10, 10))
+        for i, ax in enumerate(axs.flat):
+            ax.imshow(samples[i], cmap='gray')
+            ax.axis('off')
+
+        plt.savefig(args.samples)
+        plt.close()
