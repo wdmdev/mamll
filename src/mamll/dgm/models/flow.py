@@ -40,7 +40,7 @@ class MaskedCouplingLayer(nn.Module):
     An affine coupling layer for a normalizing flow.
     """
 
-    def __init__(self, scale_net, translation_net, mask, learn_mask=False):
+    def __init__(self, scale_net, translation_net, mask):
         """
         Define a coupling layer.
 
@@ -55,7 +55,7 @@ class MaskedCouplingLayer(nn.Module):
         super(MaskedCouplingLayer, self).__init__()
         self.scale_net = scale_net
         self.translation_net = translation_net
-        self.mask = nn.Parameter(mask, requires_grad=learn_mask)
+        self.mask = nn.Parameter(mask, requires_grad=False)
 
     def forward(self, x):
         """
@@ -109,7 +109,7 @@ class MaskedCouplingLayer(nn.Module):
 class RandomMask(MaskedCouplingLayer):
     def __init__(self, scale_net, translation_net, D):
         mask = torch.rand((D,))
-        super().__init__(scale_net, translation_net, mask, learn_mask=True)
+        super().__init__(scale_net, translation_net, mask)
 
 class ChequerboardMask(MaskedCouplingLayer):
     def __init__(self, scale_net, translation_net, D):
