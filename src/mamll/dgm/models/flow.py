@@ -108,7 +108,7 @@ class MaskedCouplingLayer(nn.Module):
 
 class RandomMask(MaskedCouplingLayer):
     def __init__(self, scale_net, translation_net, D):
-        mask = torch.rand((D,))
+        mask = torch.from_numpy(np.random.binomial(1, 0.5, size=(D,))).float()
         super().__init__(scale_net, translation_net, mask)
 
 class ChequerboardMask(MaskedCouplingLayer):
