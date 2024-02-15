@@ -138,6 +138,12 @@ if __name__ == "__main__":
         help="file to save samples in (default: %(default)s)",
     )
     parser.add_argument(
+        "--sample-posterior",
+        type=str,
+        default="posterior_samples.png",
+        help="file to save posterior samples in (default: %(default)s)",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         default="cpu",
@@ -166,10 +172,11 @@ if __name__ == "__main__":
         help="dimension of latent variable (default: %(default)s)",
     )
     parser.add_argument(
-        "--sample_posterior",
-        type=str,
-        default="posterior_samples.png",
-        help="file to save posterior sample plot in (default: %(default)s)",
+        "--lr",
+        type=float,
+        default=1e-5,
+        metavar="V",
+        help="learning rate for training (default: %(default)s)",
     )
 
     args = parser.parse_args()
@@ -244,7 +251,7 @@ if __name__ == "__main__":
     # Choose mode to run
     if args.mode == "train":
         # Define optimizer
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
         # Train model
         train(model, optimizer, mnist_train_loader, args.epochs, args.device)

@@ -10,6 +10,8 @@ submit.sh
 models/
 !src/**/models/
 pipenv/
+err/
+out/
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,vim,linux,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,vim,linux,python
