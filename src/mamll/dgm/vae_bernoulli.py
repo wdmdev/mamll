@@ -15,6 +15,8 @@ from sklearn.decomposition import PCA
 from mamll.dgm.models.vae import (
     VAE,
     GaussianPrior,
+    MogVAE,
+    MoGPrior,
     BernoulliDecoder,
     GaussianEncoder,
 )
@@ -212,8 +214,8 @@ if __name__ == "__main__":
 
     # Define prior distribution
     M = args.latent_dim
-    prior = GaussianPrior(M)
-    # prior = MoGPrior(M, 10) # Mixture of 10 Gaussians prior
+    # prior = GaussianPrior(M)
+    prior = MoGPrior(M, 10) # Mixture of 10 Gaussians prior
 
     # Define encoder and decoder networks
     encoder_net = nn.Sequential(
@@ -237,7 +239,7 @@ if __name__ == "__main__":
     # Define VAE model
     decoder = BernoulliDecoder(decoder_net)
     encoder = GaussianEncoder(encoder_net)
-    model = VAE(prior, decoder, encoder).to(device)
+    model = MogVAE(prior, decoder, encoder).to(device)
 
     # Choose mode to run
     if args.mode == "train":

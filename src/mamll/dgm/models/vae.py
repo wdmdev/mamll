@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.distributions as td
 import torch.utils.data
-from torch.distributions import Categorical, MixtureSameFamily
+from torch.distributions import Categorical, MixtureSameFamily, Normal
 
 
 class GaussianPrior(nn.Module):
@@ -40,21 +40,15 @@ class MoGPrior(nn.Module):
         super(MoGPrior, self).__init__()
         self.M = M
         self.K = K
-        # Initialize parameters for K components
-        self.means = nn.Parameter(torch.zeros(K, M), requires_grad=False)
-        self.log_stds = nn.Parameter(torch.zeros(K, M), requires_grad=False)
-        self.mixture_weights = nn.Parameter(
-            torch.ones(K) / K
-        )  # Initialize mixture weights to be uniform
+        self.mixture_weights = nn.Parameter(torch.ones(K) / K)
+        self.means = nn.Parameter(torch.randn(K, M))
+        self.log_vars = nn.Parameter(torch.zeros(K, M))
 
     def forward(self) -> torch.distributions.Distribution:
         """Return the prior distribution."""
-        component_distribution = td.Independent(
-            td.Normal(loc=self.means, scale=self.log_stds.exp()), 1
-        )
         mixture_distribution = Categorical(logits=self.mixture_weights)
-        prior = MixtureSameFamily(mixture_distribution, component_distribution)
-        return prior
+        component_distribution = Normal(self.means, self.log_vars.exp().sqrt())
+        return MixtureSameFamily(mixture_distribution, component_distribution)
 
 
 class GaussianEncoder(nn.Module):
@@ -153,9 +147,7 @@ class VAE(nn.Module):
         """
         q = self.encoder(x)
         z = q.rsample()  # reparameterization trick, under the hood
-        elbo = torch.mean(
-            self.decoder(z).log_prob(x) - td.kl_divergence(q, self.prior()), dim=0
-        )
+        elbo = torch.mean(self.decoder(z).log_prob(x) - td.kl_divergence(q, self.prior()), dim=0)
         return elbo
 
     def sample(self, n_samples: int = 1) -> torch.Tensor:
@@ -200,3 +192,42 @@ class VAE(nn.Module):
             torch.Tensor: The negative ELBO for the given batch of data.
         """
         return -self.elbo(x)
+
+class MogVAE(VAE):
+    def __init__(self, prior: nn.Module, decoder: nn.Module, encoder: nn.Module) -> None:
+        super().__init__(prior, decoder, encoder)
+
+    def elbo(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute the ELBO for the given batch of data.
+
+        Args:
+        ----------
+            x (torch.Tensor): A tensor of dimension `(batch_size, feature_dim1, feature_dim2, ...)`
+
+        Returns:
+        ----------
+            torch.Tensor: The ELBO for the given batch of data.
+        """
+        q = self.encoder(x)
+        z = q.rsample()  # reparameterization trick, under the hood
+        elbo = torch.mean(self.decoder(z).log_prob(x) 
+                          - self.approximate_kl_with_sampling(q, self.prior()), dim=0)
+        return elbo
+
+    def approximate_kl_with_sampling(self, p, q, n_samples=1000):
+        """Approximate the KL divergence from q to p by sampling from p.
+
+        Args:
+        ----------
+            p (torch.distributions.Distribution): The first distribution.
+            q (torch.distributions.Distribution): The second distribution.
+            n_samples (int): Number of samples to draw from p.
+        
+        Returns:
+        ----------
+            torch.Tensor: The approximate KL divergence from q to p.
+        """
+        samples = p.sample((n_samples,))
+        p_log_probs = p.log_prob(samples)
+        q_log_probs = q.log_prob(samples)
+        return p_log_probs.mean() - q_log_probs.mean()
