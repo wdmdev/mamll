@@ -41,8 +41,8 @@ class MoGPrior(nn.Module):
         self.M = M
         self.K = K
         self.mixture_weights = nn.Parameter(torch.ones(K) / K)
-        self.means = nn.Parameter(torch.randn(K, M))
-        self.log_vars = nn.Parameter(torch.zeros(K, M))
+        self.means = nn.Parameter(torch.randn(M, K))
+        self.log_vars = nn.Parameter(torch.zeros(M, K))
 
     def forward(self) -> torch.distributions.Distribution:
         """Return the prior distribution."""

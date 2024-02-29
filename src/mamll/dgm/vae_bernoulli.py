@@ -178,6 +178,13 @@ if __name__ == "__main__":
         metavar="V",
         help="learning rate for training (default: %(default)s)",
     )
+    parser.add_argument(
+        "--K",
+        type=int,
+        default=10,
+        metavar="K",
+        help="Number of components for Mixture of Gaussians Prior (default: %(default)s)",
+    )
 
     args = parser.parse_args()
     print("# Options")
@@ -222,7 +229,7 @@ if __name__ == "__main__":
     # Define prior distribution
     M = args.latent_dim
     # prior = GaussianPrior(M)
-    prior = MoGPrior(M, 10) # Mixture of 10 Gaussians prior
+    prior = MoGPrior(M, args.K) # Mixture of 10 Gaussians prior
 
     # Define encoder and decoder networks
     encoder_net = nn.Sequential(

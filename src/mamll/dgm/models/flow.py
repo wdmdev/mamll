@@ -71,16 +71,13 @@ class MaskedCouplingLayer(nn.Module):
         sum_log_det_J: [torch.Tensor]
             The sum of the log determinants of the Jacobian matrices of the forward transformations of dimension `(batch_size, feature_dim)`.
         """
-        not_masked = torch.ones(self.mask.shape, device=self.mask.device) - self.mask
-        masked_x = torch.mul(self.mask, x)
+        masked_x = x * self.mask
+        scale = self.scale_net(masked_x)
+        translate = self.translation_net(masked_x)
+        modified_x = (1 - self.mask) * (x * torch.exp(scale) + translate) + masked_x
+        log_det_J = torch.sum((1 - self.mask) * scale, dim=1)
+        return modified_x, log_det_J
 
-        z = masked_x + torch.mul(not_masked, 
-            torch.mul(x, torch.exp(self.scale_net(masked_x) + self.translation_net(masked_x)))
-            )
-
-        masked_z = torch.mul(self.mask, z)
-        log_det_J = torch.sum(not_masked * self.scale_net(masked_z))
-        return z, log_det_J
 
     def inverse(self, x):
         """
@@ -95,20 +92,17 @@ class MaskedCouplingLayer(nn.Module):
         sum_log_det_J: [torch.Tensor]
             The sum of the log determinants of the Jacobian matrices of the inverse transformations.
         """
-        not_masked = torch.ones(self.mask.shape, device=self.mask.device) - self.mask
-        masked_x = torch.mul(self.mask, x)
+        masked_z = z * self.mask
+        scale = self.scale_net(masked_z)
+        translate = self.translation_net(masked_z)
+        x = (1 - self.mask) * ((z - translate) * torch.exp(-scale)) + masked_z
+        log_det_J = -torch.sum((1 - self.mask) * scale, dim=1)
+        return x, log_det_J
 
-        z = masked_x + torch.mul(not_masked,
-            torch.mul(x - self.translation_net(masked_x), torch.exp(-self.scale_net(masked_x)))
-            )
-        
-        masked_z = torch.mul(self.mask, z)
-        log_det_J = torch.sum(not_masked * self.scale_net(masked_z))
-        return z, log_det_J
 
 class RandomMask(MaskedCouplingLayer):
     def __init__(self, scale_net, translation_net, D):
-        mask = torch.from_numpy(np.random.binomial(1, 0.5, size=(D,))).float()
+        mask = torch.bernoulli(0.5 * torch.ones(D))
         super().__init__(scale_net, translation_net, mask)
 
 class ChequerboardMask(MaskedCouplingLayer):
