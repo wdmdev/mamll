@@ -1,6 +1,7 @@
 # %% Programming excercise: Shallow embedding
 
 # %% Import libraries
+import os
 import torch
 from tqdm import tqdm
 
@@ -9,7 +10,7 @@ device = 'cpu'
 
 # %% Load graph data
 # Load graph from file
-A = torch.load('data.pt')
+A = torch.load(os.path.join('data', 'data.pt'))
 
 # Get number of nodes
 n_nodes = A.shape[0]
@@ -41,7 +42,7 @@ class Shallow(torch.nn.Module):
         return torch.sigmoid((self.embedding.weight[rx]*self.embedding.weight[tx]).sum(1) + self.bias)
 
 # Embedding dimension
-embedding_dim = 2
+embedding_dim = 10
 
 # Instantiate the model                
 model = Shallow(n_nodes, embedding_dim)
@@ -54,7 +55,7 @@ cross_entropy = torch.nn.BCELoss()
 
 # %% Fit the model
 # Number of gradient steps
-max_step = 1000
+max_step = 10000
 
 # Optimization loop
 for i in (progress_bar := tqdm(range(max_step))):    
