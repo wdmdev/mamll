@@ -4,6 +4,7 @@
 import os
 import torch
 from tqdm import tqdm
+from torch.optim.lr_scheduler import StepLR
 
 # %% Device
 device = 'cpu'
@@ -42,7 +43,7 @@ class Shallow(torch.nn.Module):
         return torch.sigmoid((self.embedding.weight[rx]*self.embedding.weight[tx]).sum(1) + self.bias)
 
 # Embedding dimension
-embedding_dim = 10
+embedding_dim = 5
 
 # Instantiate the model                
 model = Shallow(n_nodes, embedding_dim)
@@ -53,26 +54,47 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 # Loss function
 cross_entropy = torch.nn.BCELoss()
 
+# Train/validation split with PyTorch
+total_pairs = idx_all_pairs.shape[1]
+indices = torch.randperm(total_pairs)
+split = int(0.8 * total_pairs)  # 80% for training, 20% for validation
+
+train_idx = indices[:split]
+val_idx = indices[split:]
+print(f'Training set size: {len(train_idx)}')
+print(f'Validation set size: {len(val_idx)}')
+
+
 # %% Fit the model
 # Number of gradient steps
-max_step = 10000
+max_step = 1000
 
 # Optimization loop
 for i in (progress_bar := tqdm(range(max_step))):    
+    model.train()
     # Compute probability of each possible link
-    link_probability = model(idx_all_pairs[0], idx_all_pairs[1])
+    train_rx, train_tx = idx_all_pairs[:, train_idx]
+    link_probability = model(train_rx, train_tx)
 
     # Cross entropy loss
-    loss = cross_entropy(link_probability, target)
+    train_loss = cross_entropy(link_probability, target[train_idx])
 
     # Gradient step
     optimizer.zero_grad()
-    loss.backward()
+    train_loss.backward()
     optimizer.step()
 
+    model.eval()
+    with torch.no_grad():
+        # Compute loss on validation set
+        val_rx, val_tx = idx_all_pairs[:, val_idx]
+        val_loss = cross_entropy(model(val_rx, val_tx), target[val_idx])
+
     # Display loss on progress bar
-    progress_bar.set_description(f'Loss = {loss.item():.3f}')
+    progress_bar.set_description(f'Train/Val Loss = {train_loss.item():.3f}/{val_loss.item():.3f}')
 
 # %% Save final estimated link probabilities
-link_probability = model(idx_all_pairs[0], idx_all_pairs[1])
+model.eval()
+with torch.no_grad():
+    link_probability = model(idx_all_pairs[0], idx_all_pairs[1])
 torch.save(link_probability, 'link_probability.pt')
